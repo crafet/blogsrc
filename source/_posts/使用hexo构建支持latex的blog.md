@@ -85,10 +85,12 @@ title: 使用hexo构建支持latex的blog
 
 ​	其实我更看重的是公式的渲染。NexT中默认是支持mathjax的，只是默认是没打开的。在NexT自己的config中配置mathjax打开即可。
 
+**注意**：这里的per_page设置成true发现有时候直接不渲染公式了。真是无语。具体原因也没有查的太清楚。这里保持默认为false情况。
+
 ```yaml
 mathjax:
   enable: true
-  per_page: true
+  per_page: false
   #cdn: //cdn.bootcss.com/mathjax/2.7.1/latest.js?config=TeX-AMS-MML_HTMLorMML
   cdn: //cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 ```
@@ -108,6 +110,53 @@ J\_\alpha
 ```
 
 才能最终成功的渲染成功。
+
+对矩阵公式的支持，一般的。需要四个斜杠来完成矩阵的换行类似如下的内容
+
+```yacas
+$$
+\begin{equation}
+\begin{bmatrix}
+1 & 2 & 3 \\\\
+4 & 5 & 6 \\\\
+7 & 8 & 9 
+\end{bmatrix}+
+\begin{bmatrix}
+10 & 11 & 12 \\\\
+13 & 14 & 15 \\\\
+16 & 17 & 18
+\end{bmatrix}=
+\begin{bmatrix}
+11 & 13 & 15 \\\\
+17 & 19 & 21 \\\\
+23 & 25 & 27
+\end{bmatrix}
+\end{equation}
+$$
+```
+
+会表达成如下的公式效果：
+
+
+$$
+\begin{equation}
+\begin{bmatrix}
+1 & 2 & 3 \\\\
+4 & 5 & 6 \\\\
+7 & 8 & 9 
+\end{bmatrix}+
+\begin{bmatrix}
+10 & 11 & 12 \\\\
+13 & 14 & 15 \\\\
+16 & 17 & 18
+\end{bmatrix}=
+\begin{bmatrix}
+11 & 13 & 15 \\\\
+17 & 19 & 21 \\\\
+23 & 25 & 27
+\end{bmatrix}
+\end{equation}
+$$
 
 ## 结束
 

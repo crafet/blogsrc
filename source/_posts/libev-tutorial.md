@@ -1,6 +1,12 @@
-﻿---
-title: liev tutorial
 ---
+title: libev tutorial
+date: 2017-08-18
+tags: ["libev", "event"]
+categories: "tech"
+---
+
+
+
 ### 常见接口
 libev通过提供几个简单的接口，可以方便设置对fd的read/write等事件进行回调。定义的loop用来循环监控事件，loop可以监听的watcher都通过
 ev_TYPE定义的watcher(TYPE可以为io, signal, async, timer等事件)
@@ -21,11 +27,11 @@ ev_TYPE定义的watcher(TYPE可以为io, signal, async, timer等事件)
 	
 	// 将loop run起来。
 	ev_run(loop, 0);
-	
+
 上述的ev_init以及ev_io_set可以通过一个函数来实现
 > 
 	// 这里的callbackfn，fd， READ事件都是用来初始化io_watcher
 	// 用一个init函数更合理。
 	ev_io_init(&io_watcher, io_callback_func, fd, EV_READ);
 
-	
+​	

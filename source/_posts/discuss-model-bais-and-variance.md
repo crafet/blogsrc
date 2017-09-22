@@ -1,10 +1,8 @@
 ﻿---
 title: 关于模型的bais以及variance
-mathjax: true
----
-
-model bais Variance complexity underfitting overfitting
-
+date: 2017-06-14
+tags: ["模型","bais","variance"]
+categories: "machine learning"
 ---
 
 ##Bais与Variance 介绍##
