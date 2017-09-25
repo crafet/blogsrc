@@ -1,5 +1,5 @@
 ---
-title: 点击率预估算法系列survey
+title: 点击率预估算法survey之FTRL
 date: 2017-09-25 10:44:58
 tags: ["ctr预估", "训练算法"]
 categories: tech
@@ -55,11 +55,211 @@ RDA算法在sparsity和accuracy之间取的平衡，而google提出的FTRL算法
 
 ### 工程实现
 
-这里使用python以及golang分别实现ftrl算法。使用的数据下载自kaggle的train、test数据。
+这里使用python以及golang分别实现ftrl算法。使用的数据下载自kaggle的train、test数据。大部分逻辑是参考以github相关开源的实现。记录下来供参考。
 
-1. python实现
+数据的格式为csv的格式，我下载的数据内容为这里[avazu点击数据](https://www.kaggle.com/c/avazu-ctr-prediction/data)，压缩后数据大小为1G多，包含有40428968行。这里给出具体的实现内容并分
+
+析。
 
 ```pyt
-class FTRL
+
+from csv import DictReader 
+from math import exp, log, sqrt
+from datetime import datetime
+
+import sys
+
+D = 2 ** 20
+
+train="../py-ftrl-kaggle/small.csv"
+train = sys.argv[1]
+
+### since the date in data is 21-30
+### then if date = 30, then take it as the validate data to calc the logloss
+holdafter = 9
+holdout = 100
+
+class FTRL:
+    ## l1, l2
+    def __init__(self, l1, l2, alpha, beta, epoch, interaction):
+        self.n = [0.] * D
+        self.w = {}
+        self.z = [0.] * D
+
+        self.l1 = l1
+        self.l2 = l2
+        self.epoch = epoch
+        self.interaction = interaction
+
+        self.alpha = alpha
+        self.beta = beta
+
+
+    def data(self, file, D):
+        for t, row in enumerate(DictReader(open(file))):
+            ID = row["id"]
+
+            ## delete row["id"] for memory saving
+            del row["id"]
+
+            y = 0.
+            if "click" in row and row["click"] == "1":
+                y = 1.
+
+            ## delete row["click"] for memory saving
+            del row["click"]
+
+            ## data oriented, the train data use day 21-30 for train
+            date = int(row["hour"][4:6])
+            date -= 20
+
+            ## write useful hour data
+            row["hour"] = row["hour"][6:]
+
+
+            ## for each value ,generate its index
+            x = []
+            for key in row:
+                value = row[key]
+
+                index = abs(hash(key + "_" + value)) % D
+                x.append(index)
+                
+            
+            yield t, date, ID, x, y
+
+
+
+    ## for instance x, produce cross feature if need interaction
+    def fullindex(self, x):
+        
+        ## for bais index
+        yield 0
+
+        for index in x:
+            yield index
+
+        ## if support interaction
+        if self.interaction:
+            l = len(x)
+            x = sorted(x)
+            for i in xrange(l):
+                for j in xrange(i+1, l):
+                    yield abs(hash(str(x[i]) + "_" + str(x[j]))) % D
+
+
+    ## handle one instance x
+    def predict(self, x):
+        wtx = 0.
+        z = self.z
+        n = self.n
+
+        a = self.alpha
+        b = self.beta
+        l1 = self.l1
+        l2 = self.l2
+        
+        w = {}
+
+        wtx = 0
+        ## maybe has cross feature
+        for i in self.fullindex(x):
+            sign = -1. if z[i] < 0 else 1.
+
+            if sign * z[i] <= l1:
+                w[i] = 0.
+            else:
+                w[i] = (sign * l1 - z[i])/((b + sqrt(n[i]))/a + l2)
+        
+            wtx += w[i]
+
+        ## get updated w
+        self.w = w
+
+        return 1. / (1. + exp(-max(min(wtx, 35.), -35.)))
+
+    ## for instance x, calculate the p 
+    ## using g to update n and z
+    def update(self, x, p, y):
+        a = self.alpha
+        b = self.beta
+        n = self.n
+        z = self.z
+
+        w = self.w
+
+        ## here actually g = (p - y) * x, and x here is 1.
+        g = p - y
+
+        ## if has interaction, update the n and z for cross features
+        for i in self.fullindex(x):
+            sigma = (sqrt(n[i] + g*g) - sqrt(n[i]))/a
+            z[i] = z[i] + g - sigma * w[i]
+            n[i] = n[i] + g * g
+
+
+    ## hope the p in the gap [10e-15, 1-10e-15]
+    def logloss(self, p, y):
+        p = max(min(p, 1. - 10e-15), 10e-15)
+        return -log(p) if y == 1 else -log(1. - p)
+
+    def run(self):
+        start =  datetime.now()
+        learner = FTRL(l1=1., l2=1., alpha=0.1, beta=1., epoch=1, interaction=False)
+
+        logcount = 0
+        totalloss = 0.
+        for t, date, ID, x, y in self.data(train, D):
+
+            p = self.predict(x)
+            #print "p:", p
+
+            ## date is 1-10
+            if date > holdafter:
+                print "date:",date,"holdafter:",holdafter
+                logcount += 1
+                loss = self.logloss(p, y)
+                totalloss += loss
+
+            else:
+                self.update(x, p, y)
+
+        if logcount != 0:
+            print "avg logloss:", totalloss / logcount, \
+                    "logcount:", logcount,\
+                    "time elapsed:", datetime.now() - start
+def main():
+
+    ftrl = FTRL(l1=1., l2=1., alpha=0.1, beta=1., epoch=1, interaction=False)
+    ftrl.run()
+
+## run
+main()
 ```
+
+我们跑了10w个数据，结果如下：
+
+```bash
+date: 10 holdafter: 9
+date: 10 holdafter: 9
+avg logloss: 0.160171832485 logcount: 2 time elapsed: 0:00:07.045008
+```
+
+这里需要说明，date这一列的数据形式为14102100，即YY-MM-DD-HH，其中Hour设置为0，train数据中日期的分布是1021-1030。这里我们取出date后再减去20，得到的日期范围为1-10。其中10我们不参与训练，而是用在计算logloss上，作为model的validate。
+
+
+
+代码初始花，我们设置了$n,z$两个变量用来存储训练中的迭代变量。
+
+$x$对于一行instance，读取文件后，基于hash() %D，作为这列特征值的id，并以这个id作为索引在$n,z$中读写。
+
+其中提供的fullindex(self, x)是基于原始$x$，构建cross特征的id。代码中设置任何两个变量之间进行cross。当然这里没有做太多的特征工程，只是简单的cross了所有特征。
+
+如果interaction=False，那么训练的还是原始数据instance。
+
+predict以及update严格按照google的paper中给出的算法
+
+### 结语
+
+相对于之前使用的LBFGS，或OWLQN，最大的不同是以前的的算法会严格提出stopping criterion。但是FTRL并没有这么做。我理解，首先作者已经给出了证明，这个算法是必然收敛的；其次这里给出的是简单的遍历所有instance进行train，实际的工程使用中，可能有其他的策略变化，这里待补充实际的工业实践。
 
